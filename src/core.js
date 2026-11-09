@@ -50,14 +50,26 @@ export function mimeFromBytes(buffer, fallback = 'image/png') {
   if (/^\s*(?:<\?xml[^>]*>\s*)?<svg[\s>]/i.test(buffer.subarray(0,1024).toString('utf8'))) return 'image/svg+xml';
   return fallback;
 }
-export function extractBase64Images(payload) {
+export function imageAsset(buffer, index, fallback, revisedPrompt) {
+  if (!buffer.length) throw new Error("Image response is empty.");
+  const mimeType = mimeFromBytes(buffer, fallback || "image/png");
+  const ext = {"image/png":"png","image/jpeg":"jpg","image/webp":"webp","image/gif":"gif","image/svg+xml":"svg"}[mimeType] ?? "bin";
+  return {buffer, mimeType, fileName:`new-${index+1}.${ext}`, ...(revisedPrompt ? {revisedPrompt}: {})};
+}
+export async function extractImages(payload, download) {
   if (!Array.isArray(payload?.data)) throw new Error('Image response must contain a data array.');
-  return payload.data.map((entry, index) => {
-    if (typeof entry.b64_json !== 'string' || !entry.b64_json) throw new Error('Image response has no b64_json; URL responses are not supported.');
-    const buffer = Buffer.from(entry.b64_json, 'base64');
-    if (!buffer.length) throw new Error('Image response is empty.');
-    const mimeType = mimeFromBytes(buffer, entry.mime_type || 'image/png');
-    const ext = {'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif','image/svg+xml':'svg'}[mimeType] ?? 'bin';
-    return {buffer, mimeType, fileName:`new-${index+1}.${ext}`, ...(entry.revised_prompt ? {revisedPrompt:entry.revised_prompt}: {})};
-  });
+  return Promise.all(payload.data.map(async (entry, index) => {
+    let buffer, fallback = entry.mime_type;
+    if (typeof entry.b64_json === 'string' && entry.b64_json) {
+      buffer = Buffer.from(entry.b64_json, 'base64');
+    } else if (typeof entry.url === 'string' && entry.url.startsWith('data:')) {
+      const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([a-zA-Z0-9+/=\s]+)$/.exec(entry.url);
+      if (!match) throw new Error('Invalid image data URL.');
+      fallback = match[1]; buffer = Buffer.from(match[2], 'base64');
+    } else if (typeof entry.url === 'string') {
+      if (!download) throw new Error('URL image download is unavailable.');
+      const result = await download(entry.url); buffer = result.buffer; fallback = result.mimeType || fallback;
+    } else throw new Error('Image response has neither b64_json nor url.');
+    return imageAsset(buffer, index, fallback, entry.revised_prompt);
+  }));
 }
