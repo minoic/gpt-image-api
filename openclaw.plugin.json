@@ -1,0 +1,11 @@
+{
+  "id": "new",
+  "name": "GPT Image API",
+  "description": "OpenAI-compatible image generation and edit provider",
+  "activation": {"onStartup": false},
+  "providers": ["new"],
+  "setup": {"providers": [{"id": "new", "authMethods": ["new-api-key"], "envVars": ["GPT_IMAGE_API_KEY"]}]},
+  "providerAuthChoices": [{"provider": "new", "method": "api-key", "choiceId": "new-api-key", "choiceLabel": "GPT Image API key", "groupId": "new", "groupLabel": "GPT Image API", "optionKey": "gptImageApiKey", "cliFlag": "--gpt-image-api-key", "cliOption": "--gpt-image-api-key <key>", "cliDescription": "GPT Image API key"}],
+  "contracts": {"imageGenerationProviders": ["new"]},
+  "configSchema": {"type": "object", "additionalProperties": false, "properties": {}}
+}
